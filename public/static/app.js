@@ -113,10 +113,17 @@ function renderCustomers() {
                         </span>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
-                        <div>
-                            <i class="fas fa-envelope ml-1"></i>
-                            ${customer.email}
-                        </div>
+                        ${customer.email ? `
+                            <div>
+                                <i class="fas fa-envelope ml-1"></i>
+                                ${customer.email}
+                            </div>
+                        ` : `
+                            <div class="text-gray-400">
+                                <i class="fas fa-envelope-slash ml-1"></i>
+                                لا يوجد بريد إلكتروني
+                            </div>
+                        `}
                         ${customer.phone ? `
                             <div>
                                 <i class="fas fa-phone ml-1"></i>
@@ -146,16 +153,18 @@ function renderCustomers() {
                     </button>
                     ${customer.health_status === 'needs_attention' || customer.health_status === 'at_risk' ? `
                         <button class="bg-orange-600 text-white px-3 py-1 rounded text-sm hover:bg-orange-700" 
-                                onclick="sendProactiveMessage(${customer.id}, 'check_in')">
+                                onclick="sendProactiveMessage(${customer.id}, 'check_in')" 
+                                ${!customer.email ? 'disabled title="لا يوجد بريد إلكتروني"' : ''}>
                             <i class="fas fa-heart ml-1"></i>
-                            رسالة اطمئنان
+                            ${customer.email ? 'رسالة اطمئنان' : 'اتصال مطلوب'}
                         </button>
                     ` : ''}
                     ${getLastInteractionDays(customer.last_interaction_at) > 30 ? `
                         <button class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700" 
-                                onclick="sendProactiveMessage(${customer.id}, 'welcome_back')">
+                                onclick="sendProactiveMessage(${customer.id}, 'welcome_back')"
+                                ${!customer.email ? 'disabled title="لا يوجد بريد إلكتروني"' : ''}>
                             <i class="fas fa-handshake ml-1"></i>
-                            رسالة ترحيب
+                            ${customer.email ? 'رسالة ترحيب' : 'اتصال مطلوب'}
                         </button>
                     ` : ''}
                 </div>
@@ -452,6 +461,14 @@ async function checkAlerts() {
 // إرسال رسالة استباقية للعميل
 async function sendProactiveMessage(customerId, messageType) {
     try {
+        // البحث عن العميل للتحقق من وجود بريد إلكتروني
+        const customer = customersData.find(c => c.id === customerId);
+        
+        if (!customer || !customer.email) {
+            showNotification('⚠️ لا يمكن إرسال رسالة - العميل لا يملك بريد إلكتروني. يُنصح بالاتصال الهاتفي', 'warning');
+            return;
+        }
+        
         showNotification('جاري إرسال الرسالة...', 'info');
         
         const response = await axios.post(`/api/customers/${customerId}/proactive-message`, {
@@ -459,7 +476,11 @@ async function sendProactiveMessage(customerId, messageType) {
         });
         
         if (response.data.success) {
-            showNotification('تم إرسال الرسالة الاستباقية بنجاح 📧', 'success');
+            const messageTypes = {
+                'check_in': 'رسالة اطمئنان',
+                'welcome_back': 'رسالة ترحيب'
+            };
+            showNotification(`تم إرسال ${messageTypes[messageType]} بنجاح 📧`, 'success');
             // تحديث تاريخ آخر تفاعل
             await loadCustomers();
         } else {
@@ -467,7 +488,11 @@ async function sendProactiveMessage(customerId, messageType) {
         }
     } catch (error) {
         console.error('خطأ في إرسال الرسالة الاستباقية:', error);
-        showNotification('خطأ في إرسال الرسالة الاستباقية', 'error');
+        if (error.response?.status === 400) {
+            showNotification('لا يمكن إرسال الرسالة - العميل لا يملك بريد إلكتروني', 'warning');
+        } else {
+            showNotification('خطأ في إرسال الرسالة الاستباقية', 'error');
+        }
     }
 }
 

@@ -5,7 +5,7 @@
 CREATE TABLE IF NOT EXISTS customers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
+    email TEXT UNIQUE, -- البريد الإلكتروني اختياري
     phone TEXT,
     company TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

@@ -170,6 +170,12 @@ export class AlertService {
       ).bind(customerId).first() as Customer;
 
       if (!customer) return false;
+      
+      // التحقق من وجود بريد إلكتروني
+      if (!customer.email) {
+        console.log(`لا يمكن إرسال رسالة للعميل ${customer.name} - لا يوجد بريد إلكتروني`);
+        return false;
+      }
 
       const messages = {
         check_in: {

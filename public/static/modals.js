@@ -27,8 +27,8 @@ function showCustomerModal(customerId = null) {
                         </div>
                         
                         <div>
-                            <label class="form-label">البريد الإلكتروني *</label>
-                            <input type="email" id="customerEmail" class="form-input" required>
+                            <label class="form-label">البريد الإلكتروني</label>
+                            <input type="email" id="customerEmail" class="form-input" placeholder="اختياري - لإرسال الاستطلاعات والإشعارات">
                         </div>
                         
                         <div>

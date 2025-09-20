@@ -384,6 +384,11 @@ app.post('/api/tickets/:ticketId/send-survey', async (c) => {
       return c.json({ error: 'التذكرة غير موجودة أو غير محلولة' }, 404);
     }
 
+    // التحقق من وجود بريد إلكتروني للعميل
+    if (!ticket.customer_email) {
+      return c.json({ error: 'لا يمكن إرسال الاستطلاع - العميل لا يملك بريد إلكتروني' }, 400);
+    }
+
     // إنشاء token فريد للاستطلاع
     const surveyToken = `survey_${ticketId}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     
