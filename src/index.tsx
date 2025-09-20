@@ -1,10 +1,18 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/cloudflare-workers'
+import { createEmailService } from './services/emailService'
+import { createAlertService } from './services/alertService'
 
 // تعريف أنواع البيانات لـ Cloudflare Bindings
 type Bindings = {
   DB: D1Database;
+  // متغيرات البيئة لخدمة البريد الإلكتروني
+  RESEND_API_KEY?: string;
+  FROM_EMAIL?: string;
+  APP_URL?: string;
+  APP_NAME?: string;
+  COMPANY_NAME?: string;
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -136,10 +144,16 @@ app.get('/', (c) => {
                     <div id="customers-tab" class="tab-content">
                         <div class="flex justify-between items-center mb-4">
                             <h2 class="text-xl font-bold text-gray-800">قائمة العملاء</h2>
-                            <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-                                <i class="fas fa-plus ml-2"></i>
-                                إضافة عميل جديد
-                            </button>
+                            <div class="flex space-x-2 space-x-reverse">
+                                <button class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700" onclick="checkAlerts()">
+                                    <i class="fas fa-bell ml-2"></i>
+                                    فحص التنبيهات
+                                </button>
+                                <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700" onclick="showCustomerModal()">
+                                    <i class="fas fa-plus ml-2"></i>
+                                    إضافة عميل جديد
+                                </button>
+                            </div>
                         </div>
                         <div id="customers-list" class="space-y-4">
                             <!-- سيتم تحميل قائمة العملاء هنا -->
@@ -150,7 +164,7 @@ app.get('/', (c) => {
                     <div id="tickets-tab" class="tab-content hidden">
                         <div class="flex justify-between items-center mb-4">
                             <h2 class="text-xl font-bold text-gray-800">تذاكر الدعم</h2>
-                            <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                            <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700" onclick="showTicketModal()">
                                 <i class="fas fa-plus ml-2"></i>
                                 إنشاء تذكرة جديدة
                             </button>
@@ -181,6 +195,7 @@ app.get('/', (c) => {
 
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script src="/static/app.js"></script>
+        <script src="/static/modals.js"></script>
     </body>
     </html>
   `)
@@ -275,6 +290,301 @@ app.get('/api/tickets', async (c) => {
     return c.json(tickets.results || []);
   } catch (error) {
     return c.json({ error: 'خطأ في تحميل التذاكر' }, 500);
+  }
+});
+
+// تحديث بيانات العميل
+app.put('/api/customers/:customerId', async (c) => {
+  try {
+    const db = c.env.DB;
+    const customerId = c.req.param('customerId');
+    const { name, email, phone, company } = await c.req.json();
+    
+    await db.prepare(`
+      UPDATE customers 
+      SET name = ?, email = ?, phone = ?, company = ?, updated_at = CURRENT_TIMESTAMP 
+      WHERE id = ?
+    `).bind(name, email, phone, company, customerId).run();
+
+    return c.json({ 
+      id: customerId, 
+      name, email, phone, company,
+      message: 'تم تحديث بيانات العميل بنجاح' 
+    });
+  } catch (error) {
+    return c.json({ error: 'خطأ في تحديث بيانات العميل' }, 500);
+  }
+});
+
+// إنشاء تذكرة جديدة
+app.post('/api/tickets', async (c) => {
+  try {
+    const db = c.env.DB;
+    const { customer_id, title, description, priority, assigned_to } = await c.req.json();
+    
+    const result = await db.prepare(`
+      INSERT INTO tickets (customer_id, title, description, priority, assigned_to, created_at, updated_at) 
+      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `).bind(customer_id, title, description, priority, assigned_to).run();
+
+    // تحديث تاريخ آخر تفاعل للعميل
+    await db.prepare(`
+      UPDATE customers SET last_interaction_at = CURRENT_TIMESTAMP WHERE id = ?
+    `).bind(customer_id).run();
+
+    return c.json({ 
+      id: result.meta.last_row_id,
+      message: 'تم إنشاء التذكرة بنجاح' 
+    });
+  } catch (error) {
+    return c.json({ error: 'خطأ في إنشاء التذكرة' }, 500);
+  }
+});
+
+// الحصول على تذاكر عميل معين
+app.get('/api/customers/:customerId/tickets', async (c) => {
+  try {
+    const db = c.env.DB;
+    const customerId = c.req.param('customerId');
+    
+    const tickets = await db.prepare(`
+      SELECT 
+        t.id, t.title, t.description, t.status, t.priority,
+        t.created_at, t.updated_at,
+        e.name as assigned_to_name
+      FROM tickets t
+      LEFT JOIN employees e ON t.assigned_to = e.id
+      WHERE t.customer_id = ?
+      ORDER BY t.created_at DESC
+    `).bind(customerId).all();
+
+    return c.json(tickets.results || []);
+  } catch (error) {
+    return c.json({ error: 'خطأ في تحميل تذاكر العميل' }, 500);
+  }
+});
+
+// إرسال استطلاع رضا للعميل
+app.post('/api/tickets/:ticketId/send-survey', async (c) => {
+  try {
+    const db = c.env.DB;
+    const ticketId = c.req.param('ticketId');
+    
+    // الحصول على معلومات التذكرة والعميل
+    const ticket = await db.prepare(`
+      SELECT 
+        t.id, t.title, t.customer_id,
+        c.name as customer_name, c.email as customer_email
+      FROM tickets t
+      LEFT JOIN customers c ON t.customer_id = c.id
+      WHERE t.id = ? AND t.status = 'resolved'
+    `).bind(ticketId).first();
+
+    if (!ticket) {
+      return c.json({ error: 'التذكرة غير موجودة أو غير محلولة' }, 404);
+    }
+
+    // إنشاء token فريد للاستطلاع
+    const surveyToken = `survey_${ticketId}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    
+    // إدراج استطلاع جديد في قاعدة البيانات
+    await db.prepare(`
+      INSERT INTO satisfaction_surveys (ticket_id, customer_id, survey_token)
+      VALUES (?, ?, ?)
+    `).bind(ticket.id, ticket.customer_id, surveyToken).run();
+
+    // إرسال البريد الإلكتروني
+    const emailService = createEmailService(c.env);
+    const emailSent = await emailService.sendSatisfactionSurvey({
+      customerName: ticket.customer_name,
+      customerEmail: ticket.customer_email,
+      ticketTitle: ticket.title,
+      ticketId: ticket.id,
+      surveyToken: surveyToken,
+    });
+
+    if (emailSent) {
+      return c.json({ 
+        success: true, 
+        message: 'تم إرسال استطلاع الرضا بنجاح',
+        surveyToken 
+      });
+    } else {
+      return c.json({ 
+        success: false, 
+        message: 'فشل في إرسال البريد الإلكتروني' 
+      }, 500);
+    }
+
+  } catch (error) {
+    console.error('خطأ في إرسال استطلاع الرضا:', error);
+    return c.json({ error: 'خطأ في إرسال استطلاع الرضا' }, 500);
+  }
+});
+
+// الحصول على قائمة استطلاعات الرضا
+app.get('/api/surveys', async (c) => {
+  try {
+    const db = c.env.DB;
+    const surveys = await db.prepare(`
+      SELECT 
+        s.id, s.ticket_id, s.survey_token, s.rating, s.comment,
+        s.sent_at, s.responded_at,
+        c.name as customer_name, c.email as customer_email,
+        t.title as ticket_title
+      FROM satisfaction_surveys s
+      LEFT JOIN customers c ON s.customer_id = c.id
+      LEFT JOIN tickets t ON s.ticket_id = t.id
+      ORDER BY s.sent_at DESC
+    `).all();
+
+    return c.json(surveys.results || []);
+  } catch (error) {
+    return c.json({ error: 'خطأ في تحميل استطلاعات الرضا' }, 500);
+  }
+});
+
+// إرسال إشعار للعميل
+app.post('/api/customers/:customerId/send-notification', async (c) => {
+  try {
+    const db = c.env.DB;
+    const customerId = c.req.param('customerId');
+    const { subject, message, actionUrl, actionText } = await c.req.json();
+    
+    // الحصول على معلومات العميل
+    const customer = await db.prepare(`
+      SELECT name, email FROM customers WHERE id = ?
+    `).bind(customerId).first();
+
+    if (!customer) {
+      return c.json({ error: 'العميل غير موجود' }, 404);
+    }
+
+    // إرسال الإشعار
+    const emailService = createEmailService(c.env);
+    const emailSent = await emailService.sendNotification({
+      customerName: customer.name,
+      customerEmail: customer.email,
+      subject,
+      message,
+      actionUrl,
+      actionText,
+    });
+
+    if (emailSent) {
+      return c.json({ 
+        success: true, 
+        message: 'تم إرسال الإشعار بنجاح'
+      });
+    } else {
+      return c.json({ 
+        success: false, 
+        message: 'فشل في إرسال الإشعار' 
+      }, 500);
+    }
+
+  } catch (error) {
+    console.error('خطأ في إرسال الإشعار:', error);
+    return c.json({ error: 'خطأ في إرسال الإشعار' }, 500);
+  }
+});
+
+// فحص التنبيهات وإرسالها
+app.post('/api/alerts/check', async (c) => {
+  try {
+    const db = c.env.DB;
+    const alertService = createAlertService(db, c.env);
+    
+    const alerts = await alertService.checkAllCustomers();
+    
+    if (alerts.length > 0) {
+      await alertService.sendTeamAlerts(alerts);
+    }
+    
+    return c.json({ 
+      success: true, 
+      alertsFound: alerts.length,
+      alerts: alerts.map(alert => ({
+        customerId: alert.customerId,
+        type: alert.type,
+        severity: alert.severity,
+        message: alert.message
+      }))
+    });
+  } catch (error) {
+    console.error('خطأ في فحص التنبيهات:', error);
+    return c.json({ error: 'خطأ في فحص التنبيهات' }, 500);
+  }
+});
+
+// إرسال رسالة استباقية لعميل
+app.post('/api/customers/:customerId/proactive-message', async (c) => {
+  try {
+    const db = c.env.DB;
+    const customerId = c.req.param('customerId');
+    const { type } = await c.req.json(); // 'check_in' أو 'welcome_back'
+    
+    const alertService = createAlertService(db, c.env);
+    const success = await alertService.sendProactiveMessage(parseInt(customerId), type);
+    
+    if (success) {
+      return c.json({ 
+        success: true, 
+        message: 'تم إرسال الرسالة الاستباقية بنجاح' 
+      });
+    } else {
+      return c.json({ 
+        success: false, 
+        message: 'فشل في إرسال الرسالة الاستباقية' 
+      }, 500);
+    }
+  } catch (error) {
+    console.error('خطأ في إرسال الرسالة الاستباقية:', error);
+    return c.json({ error: 'خطأ في إرسال الرسالة الاستباقية' }, 500);
+  }
+});
+
+// الحصول على تحليل صحة العملاء
+app.get('/api/customers/health-analysis', async (c) => {
+  try {
+    const db = c.env.DB;
+    
+    // إحصائيات حسب حالة الصحة
+    const healthStats = await db.prepare(`
+      SELECT 
+        health_status,
+        COUNT(*) as count,
+        AVG(health_score) as avg_score
+      FROM customers 
+      GROUP BY health_status
+    `).all();
+    
+    // العملاء في خطر (health_score < 4)
+    const atRiskCustomers = await db.prepare(`
+      SELECT id, name, email, health_score, last_interaction_at
+      FROM customers 
+      WHERE health_score < 4 
+      ORDER BY health_score ASC
+    `).all();
+    
+    // العملاء الذين لم يتفاعلوا لفترة طويلة (> 30 يوم)
+    const inactiveCustomers = await db.prepare(`
+      SELECT id, name, email, last_interaction_at,
+             ROUND(JULIANDAY('now') - JULIANDAY(last_interaction_at)) as days_inactive
+      FROM customers 
+      WHERE last_interaction_at IS NOT NULL 
+        AND JULIANDAY('now') - JULIANDAY(last_interaction_at) > 30
+      ORDER BY days_inactive DESC
+    `).all();
+    
+    return c.json({
+      healthStats: healthStats.results || [],
+      atRiskCustomers: atRiskCustomers.results || [],
+      inactiveCustomers: inactiveCustomers.results || []
+    });
+  } catch (error) {
+    console.error('خطأ في تحليل صحة العملاء:', error);
+    return c.json({ error: 'خطأ في تحليل صحة العملاء' }, 500);
   }
 });
 

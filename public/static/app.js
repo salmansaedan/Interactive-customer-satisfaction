@@ -4,6 +4,7 @@
 let currentTab = 'customers';
 let customersData = [];
 let ticketsData = [];
+let surveysData = [];
 
 // تهيئة التطبيق عند تحميل الصفحة
 document.addEventListener('DOMContentLoaded', function() {
@@ -16,6 +17,7 @@ async function initializeApp() {
     await loadStats();
     await loadCustomers();
     await loadTickets();
+    await loadSurveys();
 }
 
 // إعداد التنقل بين التبويبات
@@ -142,6 +144,20 @@ function renderCustomers() {
                         <i class="fas fa-ticket-alt ml-1"></i>
                         إنشاء تذكرة
                     </button>
+                    ${customer.health_status === 'needs_attention' || customer.health_status === 'at_risk' ? `
+                        <button class="bg-orange-600 text-white px-3 py-1 rounded text-sm hover:bg-orange-700" 
+                                onclick="sendProactiveMessage(${customer.id}, 'check_in')">
+                            <i class="fas fa-heart ml-1"></i>
+                            رسالة اطمئنان
+                        </button>
+                    ` : ''}
+                    ${getLastInteractionDays(customer.last_interaction_at) > 30 ? `
+                        <button class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700" 
+                                onclick="sendProactiveMessage(${customer.id}, 'welcome_back')">
+                            <i class="fas fa-handshake ml-1"></i>
+                            رسالة ترحيب
+                        </button>
+                    ` : ''}
                 </div>
             </div>
         </div>
@@ -225,24 +241,36 @@ function renderTickets() {
 // إرسال استطلاع رضا
 async function sendSatisfactionSurvey(ticketId) {
     try {
-        // هنا سيتم تطبيق منطق إرسال استطلاع الرضا
-        showNotification('تم إرسال استطلاع الرضا بنجاح', 'success');
+        // إظهار رسالة تحميل
+        showNotification('جاري إرسال استطلاع الرضا...', 'info');
+        
+        const response = await axios.post(`/api/tickets/${ticketId}/send-survey`);
+        
+        if (response.data.success) {
+            showNotification('تم إرسال استطلاع الرضا بنجاح 📧', 'success');
+            // إعادة تحميل التذاكر لتحديث الحالة
+            await loadTickets();
+        } else {
+            showNotification(response.data.message || 'فشل في إرسال الاستطلاع', 'error');
+        }
     } catch (error) {
-        showNotification('خطأ في إرسال استطلاع الرضا', 'error');
+        console.error('خطأ في إرسال استطلاع الرضا:', error);
+        if (error.response?.data?.error) {
+            showNotification(error.response.data.error, 'error');
+        } else {
+            showNotification('خطأ في إرسال استطلاع الرضا', 'error');
+        }
     }
 }
 
 // فتح ملف العميل
 function openCustomerProfile(customerId) {
-    // هنا سيتم فتح نافذة منبثقة أو صفحة جديدة لملف العميل
-    console.log('فتح ملف العميل:', customerId);
-    showNotification('سيتم تطوير هذه الميزة قريباً', 'info');
+    showCustomerProfileModal(customerId);
 }
 
 // إنشاء تذكرة جديدة لعميل
 function createTicketForCustomer(customerId) {
-    console.log('إنشاء تذكرة للعميل:', customerId);
-    showNotification('سيتم تطوير هذه الميزة قريباً', 'info');
+    showTicketModal(customerId);
 }
 
 // فتح تذكرة
@@ -283,6 +311,14 @@ function formatDate(dateString) {
     });
 }
 
+function getLastInteractionDays(dateString) {
+    if (!dateString) return 0;
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
 // نظام الإشعارات
 function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
@@ -306,7 +342,145 @@ function getNotificationColor(type) {
     }
 }
 
+// تحميل استطلاعات الرضا
+async function loadSurveys() {
+    try {
+        const response = await axios.get('/api/surveys');
+        surveysData = response.data;
+        renderSurveys();
+    } catch (error) {
+        console.error('خطأ في تحميل استطلاعات الرضا:', error);
+        showNotification('خطأ في تحميل استطلاعات الرضا', 'error');
+    }
+}
+
+// عرض استطلاعات الرضا
+function renderSurveys() {
+    const surveysList = document.getElementById('surveys-list');
+    
+    if (surveysData.length === 0) {
+        surveysList.innerHTML = `
+            <div class="text-center py-8 text-gray-500">
+                <i class="fas fa-poll text-4xl mb-4"></i>
+                <p>لا توجد استطلاعات رضا بعد</p>
+            </div>
+        `;
+        return;
+    }
+    
+    surveysList.innerHTML = surveysData.map(survey => `
+        <div class="bg-white border border-gray-200 rounded-lg p-4">
+            <div class="flex justify-between items-start">
+                <div class="flex-1">
+                    <div class="flex items-center mb-2">
+                        <h3 class="text-lg font-semibold text-gray-800">${survey.ticket_title}</h3>
+                        ${survey.rating ? `
+                            <span class="mr-3 text-2xl">
+                                ${getRatingEmoji(survey.rating)}
+                            </span>
+                        ` : `
+                            <span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-sm mr-3">
+                                في الانتظار
+                            </span>
+                        `}
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
+                        <div>
+                            <i class="fas fa-user ml-1"></i>
+                            ${survey.customer_name}
+                        </div>
+                        <div>
+                            <i class="fas fa-envelope ml-1"></i>
+                            ${survey.customer_email}
+                        </div>
+                        <div>
+                            <i class="fas fa-paper-plane ml-1"></i>
+                            أُرسل: ${formatDate(survey.sent_at)}
+                        </div>
+                        ${survey.responded_at ? `
+                            <div>
+                                <i class="fas fa-check ml-1"></i>
+                                رد: ${formatDate(survey.responded_at)}
+                            </div>
+                        ` : ''}
+                    </div>
+                    ${survey.comment ? `
+                        <div class="mt-3 p-3 bg-gray-50 rounded border-r-4 border-blue-500">
+                            <p class="text-sm text-gray-700">💬 "${survey.comment}"</p>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// الحصول على الإيموجي المناسب للتقييم
+function getRatingEmoji(rating) {
+    switch (rating) {
+        case 1: return '😞';
+        case 2: return '😐';
+        case 3: return '😊';
+        default: return '❓';
+    }
+}
+
+// فحص التنبيهات
+async function checkAlerts() {
+    try {
+        showNotification('جاري فحص تنبيهات العملاء...', 'info');
+        
+        const response = await axios.post('/api/alerts/check');
+        
+        if (response.data.success) {
+            const alertsCount = response.data.alertsFound;
+            if (alertsCount > 0) {
+                showNotification(`تم اكتشاف ${alertsCount} تنبيه وإرسالها للفريق 🚨`, 'warning');
+                // إعادة تحميل البيانات
+                await loadStats();
+                await loadCustomers();
+            } else {
+                showNotification('لا توجد تنبيهات جديدة 👍', 'success');
+            }
+        }
+    } catch (error) {
+        console.error('خطأ في فحص التنبيهات:', error);
+        showNotification('خطأ في فحص التنبيهات', 'error');
+    }
+}
+
+// إرسال رسالة استباقية للعميل
+async function sendProactiveMessage(customerId, messageType) {
+    try {
+        showNotification('جاري إرسال الرسالة...', 'info');
+        
+        const response = await axios.post(`/api/customers/${customerId}/proactive-message`, {
+            type: messageType // 'check_in' أو 'welcome_back'
+        });
+        
+        if (response.data.success) {
+            showNotification('تم إرسال الرسالة الاستباقية بنجاح 📧', 'success');
+            // تحديث تاريخ آخر تفاعل
+            await loadCustomers();
+        } else {
+            showNotification(response.data.message || 'فشل في إرسال الرسالة', 'error');
+        }
+    } catch (error) {
+        console.error('خطأ في إرسال الرسالة الاستباقية:', error);
+        showNotification('خطأ في إرسال الرسالة الاستباقية', 'error');
+    }
+}
+
+// إرسال إشعار للعميل
+async function sendCustomerNotification(customerId) {
+    // هذه الوظيفة ستُطوَّر لاحقاً مع النوافذ المنبثقة
+    showNotification('سيتم تطوير هذه الميزة قريباً', 'info');
+}
+
 // تحديث البيانات كل دقيقة
 setInterval(async () => {
     await loadStats();
+    if (currentTab === 'surveys') {
+        await loadSurveys();
+    }
 }, 60000);

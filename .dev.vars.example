@@ -1,0 +1,15 @@
+# متغيرات البيئة للتطوير المحلي
+# انسخ هذا الملف إلى .dev.vars وأدخل القيم الفعلية
+
+# Resend API Key لإرسال البريد الإلكتروني
+RESEND_API_KEY=your_resend_api_key_here
+
+# عنوان البريد الإلكتروني المرسل (يجب أن يكون مؤكد في Resend)
+FROM_EMAIL=noreply@yourdomain.com
+
+# رابط التطبيق الأساسي (للاستطلاعات)
+APP_URL=https://your-app.pages.dev
+
+# إعدادات أخرى اختيارية
+APP_NAME=عميلي أولاً
+COMPANY_NAME=شركة سالم سعدان للتطوير العقاري
