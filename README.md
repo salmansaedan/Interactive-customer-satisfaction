@@ -12,7 +12,7 @@
 
 ## الروابط
 - **الإنتاج**: https://3000-i3ltn0hbcuzu2vmgxnjja-6532622b.e2b.dev
-- **GitHub**: (قيد الإعداد)
+- **GitHub**: https://github.com/salmansaedan/Interactive-customer-satisfaction
 - **API Health**: https://3000-i3ltn0hbcuzu2vmgxnjja-6532622b.e2b.dev/api/stats
 
 ## الهيكل التنظيمي المُطبق
