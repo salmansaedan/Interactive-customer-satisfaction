@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/cloudflare-workers'
 import { createEmailService } from './services/emailService'
 import { createAlertService } from './services/alertService'
+import CapacityService from './services/capacityService'
 
 // تعريف أنواع البيانات لـ Cloudflare Bindings
 type Bindings = {
@@ -135,6 +136,10 @@ app.get('/', (c) => {
                             <i class="fas fa-book ml-2"></i>
                             قاعدة المعرفة
                         </button>
+                        <button class="tab-btn py-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="organization">
+                            <i class="fas fa-sitemap ml-2"></i>
+                            الهيكل التنظيمي
+                        </button>
                     </nav>
                 </div>
 
@@ -189,6 +194,152 @@ app.get('/', (c) => {
                             <!-- سيتم تحميل قاعدة المعرفة هنا -->
                         </div>
                     </div>
+
+                    <!-- تبويب الهيكل التنظيمي -->
+                    <div id="organization-tab" class="tab-content hidden">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-xl font-bold text-gray-800">إدارة الهيكل التنظيمي</h2>
+                            <div class="flex space-x-2 space-x-reverse">
+                                <button class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700" onclick="checkCapacityAlerts()">
+                                    <i class="fas fa-exclamation-triangle ml-2"></i>
+                                    فحص السعة
+                                </button>
+                                <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700" onclick="distributeCustomers()">
+                                    <i class="fas fa-users ml-2"></i>
+                                    توزيع العملاء
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- إحصائيات الهيكل التنظيمي -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                            <div class="bg-blue-50 border-r-4 border-blue-400 p-4">
+                                <div class="flex items-center">
+                                    <i class="fas fa-user-tie text-blue-600 text-2xl ml-3"></i>
+                                    <div>
+                                        <p class="text-sm font-medium text-blue-900">مديرين المستوى الأول</p>
+                                        <p class="text-2xl font-bold text-blue-800" id="level1-managers-count">0</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-green-50 border-r-4 border-green-400 p-4">
+                                <div class="flex items-center">
+                                    <i class="fas fa-users text-green-600 text-2xl ml-3"></i>
+                                    <div>
+                                        <p class="text-sm font-medium text-green-900">مديرين المستوى الثاني</p>
+                                        <p class="text-2xl font-bold text-green-800" id="level2-managers-count">0</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-yellow-50 border-r-4 border-yellow-400 p-4">
+                                <div class="flex items-center">
+                                    <i class="fas fa-user text-yellow-600 text-2xl ml-3"></i>
+                                    <div>
+                                        <p class="text-sm font-medium text-yellow-900">الموظفين</p>
+                                        <p class="text-2xl font-bold text-yellow-800" id="employees-count">0</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-purple-50 border-r-4 border-purple-400 p-4">
+                                <div class="flex items-center">
+                                    <i class="fas fa-handshake text-purple-600 text-2xl ml-3"></i>
+                                    <div>
+                                        <p class="text-sm font-medium text-purple-900">العملاء المربوطين</p>
+                                        <p class="text-2xl font-bold text-purple-800" id="assigned-customers-count">0</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- التنبيهات النشطة -->
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                            <h3 class="text-lg font-semibold text-red-800 mb-3">
+                                <i class="fas fa-bell ml-2"></i>
+                                التنبيهات النشطة
+                            </h3>
+                            <div id="capacity-alerts" class="space-y-2">
+                                <!-- سيتم تحميل التنبيهات هنا -->
+                            </div>
+                        </div>
+
+                        <!-- التبويبات الفرعية -->
+                        <div class="border-b border-gray-200 mb-4">
+                            <nav class="flex space-x-4 space-x-reverse">
+                                <button class="org-tab-btn py-2 px-4 border-b-2 border-blue-500 text-blue-600 font-medium" data-org-tab="overview">
+                                    نظرة عامة
+                                </button>
+                                <button class="org-tab-btn py-2 px-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-org-tab="employees">
+                                    الموظفين
+                                </button>
+                                <button class="org-tab-btn py-2 px-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-org-tab="managers">
+                                    المديرين
+                                </button>
+                                <button class="org-tab-btn py-2 px-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-org-tab="reports">
+                                    التقارير
+                                </button>
+                            </nav>
+                        </div>
+
+                        <!-- النظرة العامة -->
+                        <div id="overview-org-tab" class="org-tab-content">
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <!-- خريطة الهيكل التنظيمي -->
+                                <div class="bg-white border rounded-lg p-4">
+                                    <h4 class="font-semibold text-gray-800 mb-4">خريطة الهيكل التنظيمي</h4>
+                                    <div id="org-chart" class="text-center">
+                                        <!-- سيتم إنشاء الخريطة هنا -->
+                                    </div>
+                                </div>
+
+                                <!-- إحصائيات مفصلة -->
+                                <div class="bg-white border rounded-lg p-4">
+                                    <h4 class="font-semibold text-gray-800 mb-4">إحصائيات مفصلة</h4>
+                                    <div id="detailed-stats" class="space-y-3">
+                                        <!-- سيتم تحميل الإحصائيات المفصلة هنا -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- قائمة الموظفين -->
+                        <div id="employees-org-tab" class="org-tab-content hidden">
+                            <div class="flex justify-between items-center mb-4">
+                                <h4 class="font-semibold text-gray-800">قائمة الموظفين</h4>
+                                <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700" onclick="openAddEmployeeModal()">
+                                    <i class="fas fa-plus ml-2"></i>
+                                    إضافة موظف
+                                </button>
+                            </div>
+                            <div id="employees-list" class="bg-white border rounded-lg overflow-hidden">
+                                <!-- سيتم تحميل قائمة الموظفين هنا -->
+                            </div>
+                        </div>
+
+                        <!-- قائمة المديرين -->
+                        <div id="managers-org-tab" class="org-tab-content hidden">
+                            <div class="flex justify-between items-center mb-4">
+                                <h4 class="font-semibold text-gray-800">قائمة مديري المستوى الثاني</h4>
+                                <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700" onclick="openAddManagerModal()">
+                                    <i class="fas fa-plus ml-2"></i>
+                                    إضافة مدير
+                                </button>
+                            </div>
+                            <div id="managers-list" class="bg-white border rounded-lg overflow-hidden">
+                                <!-- سيتم تحميل قائمة المديرين هنا -->
+                            </div>
+                        </div>
+
+                        <!-- التقارير -->
+                        <div id="reports-org-tab" class="org-tab-content hidden">
+                            <h4 class="font-semibold text-gray-800 mb-4">تقارير الأداء والسعة</h4>
+                            <div id="capacity-reports" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <!-- سيتم تحميل التقارير هنا -->
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -196,6 +347,7 @@ app.get('/', (c) => {
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script src="/static/app.js"></script>
         <script src="/static/modals.js"></script>
+        <script src="/static/organization.js"></script>
     </body>
     </html>
   `)
@@ -723,5 +875,187 @@ async function updateCustomerHealth(db: D1Database, customerId: number) {
     console.error('Error updating customer health:', error);
   }
 }
+
+// ========================================
+// API endpoints للهيكل التنظيمي
+// Organizational Structure API endpoints
+// ========================================
+
+// الحصول على إحصائيات السعة التنظيمية
+// Get organizational capacity statistics
+app.get('/api/capacity/stats', async (c) => {
+  try {
+    const { env } = c;
+    const stats = await CapacityService.getCapacityStats(env.DB);
+    return c.json(stats);
+  } catch (error) {
+    console.error('Error getting capacity stats:', error);
+    return c.json({ error: 'Failed to get capacity statistics' }, 500);
+  }
+});
+
+// فحص السعة وإنشاء التنبيهات
+// Check capacity and generate alerts
+app.post('/api/capacity/check', async (c) => {
+  try {
+    const { env } = c;
+    const alerts = await CapacityService.checkCapacityAndGenerateAlerts(env.DB);
+    return c.json({ alerts, count: alerts.length });
+  } catch (error) {
+    console.error('Error checking capacity:', error);
+    return c.json({ error: 'Failed to check capacity' }, 500);
+  }
+});
+
+// الحصول على التنبيهات النشطة
+// Get active capacity alerts
+app.get('/api/capacity/alerts', async (c) => {
+  try {
+    const { env } = c;
+    const alerts = await CapacityService.getActiveAlerts(env.DB);
+    return c.json(alerts);
+  } catch (error) {
+    console.error('Error getting alerts:', error);
+    return c.json({ error: 'Failed to get alerts' }, 500);
+  }
+});
+
+// حل تنبيه
+// Resolve alert
+app.post('/api/capacity/alerts/:id/resolve', async (c) => {
+  try {
+    const { env } = c;
+    const alertId = parseInt(c.req.param('id'));
+    await CapacityService.resolveAlert(env.DB, alertId);
+    return c.json({ success: true, message: 'تم حل التنبيه بنجاح' });
+  } catch (error) {
+    console.error('Error resolving alert:', error);
+    return c.json({ error: 'Failed to resolve alert' }, 500);
+  }
+});
+
+// توزيع العملاء غير المربوطين
+// Distribute unassigned customers
+app.post('/api/capacity/distribute', async (c) => {
+  try {
+    const { env } = c;
+    const result = await CapacityService.distributeUnassignedCustomers(env.DB);
+    return c.json(result);
+  } catch (error) {
+    console.error('Error distributing customers:', error);
+    return c.json({ error: 'Failed to distribute customers' }, 500);
+  }
+});
+
+// الحصول على تقرير الهيكل التنظيمي
+// Get organizational structure report
+app.get('/api/organization/report', async (c) => {
+  try {
+    const { env } = c;
+    const report = await CapacityService.getOrganizationalReport(env.DB);
+    return c.json(report);
+  } catch (error) {
+    console.error('Error getting organizational report:', error);
+    return c.json({ error: 'Failed to get organizational report' }, 500);
+  }
+});
+
+// إضافة موظف جديد
+// Add new employee
+app.post('/api/employees', async (c) => {
+  try {
+    const { env } = c;
+    const { name, email, phone, level2_manager_id } = await c.req.json();
+    
+    const result = await env.DB.prepare(`
+      INSERT INTO employees (name, email, phone, level2_manager_id) 
+      VALUES (?, ?, ?, ?)
+    `).bind(name, email || null, phone || null, level2_manager_id).run();
+    
+    return c.json({ 
+      success: true, 
+      employee_id: result.meta.last_row_id,
+      message: 'تم إضافة الموظف بنجاح' 
+    });
+  } catch (error) {
+    console.error('Error adding employee:', error);
+    return c.json({ error: 'Failed to add employee' }, 500);
+  }
+});
+
+// إضافة مدير مستوى ثاني جديد
+// Add new level 2 manager
+app.post('/api/level2-managers', async (c) => {
+  try {
+    const { env } = c;
+    const { name, email, phone, level1_manager_id } = await c.req.json();
+    
+    const result = await env.DB.prepare(`
+      INSERT INTO level2_managers (name, email, phone, level1_manager_id) 
+      VALUES (?, ?, ?, ?)
+    `).bind(name, email || null, phone || null, level1_manager_id).run();
+    
+    return c.json({ 
+      success: true, 
+      manager_id: result.meta.last_row_id,
+      message: 'تم إضافة المدير بنجاح' 
+    });
+  } catch (error) {
+    console.error('Error adding level 2 manager:', error);
+    return c.json({ error: 'Failed to add manager' }, 500);
+  }
+});
+
+// الحصول على قائمة الموظفين
+// Get employees list
+app.get('/api/employees', async (c) => {
+  try {
+    const { env } = c;
+    const employees = await env.DB.prepare(`
+      SELECT 
+        e.*,
+        lm2.name as manager_name,
+        COUNT(c.id) as customers_count
+      FROM employees e
+      LEFT JOIN level2_managers lm2 ON lm2.id = e.level2_manager_id
+      LEFT JOIN customers c ON c.employee_id = e.id
+      WHERE e.is_active = 1
+      GROUP BY e.id
+      ORDER BY e.name
+    `).all();
+    
+    return c.json(employees.results);
+  } catch (error) {
+    console.error('Error getting employees:', error);
+    return c.json({ error: 'Failed to get employees' }, 500);
+  }
+});
+
+// الحصول على قائمة مديري المستوى الثاني
+// Get level 2 managers list
+app.get('/api/level2-managers', async (c) => {
+  try {
+    const { env } = c;
+    const managers = await env.DB.prepare(`
+      SELECT 
+        lm2.*,
+        lm1.name as level1_manager_name,
+        COUNT(DISTINCT e.id) as employees_count,
+        COUNT(DISTINCT c.id) as total_customers_count
+      FROM level2_managers lm2
+      LEFT JOIN level1_managers lm1 ON lm1.id = lm2.level1_manager_id
+      LEFT JOIN employees e ON e.level2_manager_id = lm2.id AND e.is_active = 1
+      LEFT JOIN customers c ON c.employee_id = e.id
+      WHERE lm2.is_active = 1
+      GROUP BY lm2.id
+      ORDER BY lm2.name
+    `).all();
+    
+    return c.json(managers.results);
+  } catch (error) {
+    console.error('Error getting level 2 managers:', error);
+    return c.json({ error: 'Failed to get managers' }, 500);
+  }
+});
 
 export default app

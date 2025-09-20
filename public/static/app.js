@@ -59,6 +59,11 @@ function switchTab(tabId) {
     }
     
     currentTab = tabId;
+    
+    // تحميل البيانات الخاصة بالتبويب
+    if (tabId === 'organization') {
+        loadOrganizationData();
+    }
 }
 
 // تحميل الإحصائيات العامة
