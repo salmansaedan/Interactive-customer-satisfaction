@@ -25,18 +25,11 @@ CREATE TABLE IF NOT EXISTS level2_managers (
   FOREIGN KEY (level1_manager_id) REFERENCES level1_managers(id)
 );
 
--- جدول الموظفين
--- Employees Table
-CREATE TABLE IF NOT EXISTS employees (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  email TEXT,
-  phone TEXT,
-  level2_manager_id INTEGER NOT NULL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  is_active BOOLEAN DEFAULT 1,
-  FOREIGN KEY (level2_manager_id) REFERENCES level2_managers(id)
-);
+-- تحديث جدول الموظفين الموجود
+-- Update existing employees table
+ALTER TABLE employees ADD COLUMN phone TEXT;
+ALTER TABLE employees ADD COLUMN level2_manager_id INTEGER REFERENCES level2_managers(id);
+ALTER TABLE employees ADD COLUMN is_active BOOLEAN DEFAULT 1;
 
 -- تحديث جدول العملاء لربطه بالموظف المسؤول
 -- Update customers table to link with responsible employee

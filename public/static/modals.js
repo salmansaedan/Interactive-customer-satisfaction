@@ -6,44 +6,112 @@
 function showCustomerModal(customerId = null) {
     const isEdit = customerId !== null;
     const title = isEdit ? 'تحرير العميل' : 'إضافة عميل جديد';
-    
+
     const modalHTML = `
         <div id="customerModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-            <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+            <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-bold text-gray-800">${title}</h2>
                     <button onclick="closeModal('customerModal')" class="text-gray-400 hover:text-gray-600">
                         <i class="fas fa-times text-xl"></i>
                     </button>
                 </div>
-                
+
                 <form id="customerForm" onsubmit="submitCustomerForm(event)">
                     <input type="hidden" id="customerId" value="${customerId || ''}">
-                    
-                    <div class="space-y-4">
-                        <div>
-                            <label class="form-label">الاسم *</label>
-                            <input type="text" id="customerName" class="form-input" required>
-                        </div>
-                        
-                        <div>
-                            <label class="form-label">البريد الإلكتروني</label>
-                            <input type="email" id="customerEmail" class="form-input" placeholder="اختياري - لإرسال الاستطلاعات والإشعارات">
-                        </div>
-                        
-                        <div>
-                            <label class="form-label">رقم الهاتف</label>
-                            <input type="tel" id="customerPhone" class="form-input">
-                        </div>
-                        
-                        <div>
-                            <label class="form-label">الشركة</label>
-                            <input type="text" id="customerCompany" class="form-input">
+
+                    <!-- معلومات الاسم -->
+                    <div class="bg-blue-50 p-4 rounded-lg mb-4">
+                        <h3 class="font-semibold text-gray-700 mb-3">
+                            <i class="fas fa-user ml-2"></i>
+                            معلومات الاسم
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="form-label">الاسم الأول *</label>
+                                <input type="text" id="customerFirstName" class="form-input" required>
+                            </div>
+                            <div>
+                                <label class="form-label">الاسم الأوسط</label>
+                                <input type="text" id="customerMiddleName" class="form-input">
+                            </div>
+                            <div>
+                                <label class="form-label">اسم العائلة *</label>
+                                <input type="text" id="customerLastName" class="form-input" required>
+                            </div>
                         </div>
                     </div>
-                    
+
+                    <!-- معلومات الاتصال -->
+                    <div class="bg-green-50 p-4 rounded-lg mb-4">
+                        <h3 class="font-semibold text-gray-700 mb-3">
+                            <i class="fas fa-phone ml-2"></i>
+                            معلومات الاتصال
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="form-label">رقم الجوال *</label>
+                                <input type="tel" id="customerPhone" class="form-input" required
+                                       placeholder="05xxxxxxxx">
+                            </div>
+                            <div>
+                                <label class="form-label">وسيلة التواصل *</label>
+                                <select id="customerCommunicationMethod" class="form-input" required>
+                                    <option value="whatsapp">واتساب</option>
+                                    <option value="sms">رسائل نصية</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="form-label">البريد الإلكتروني</label>
+                                <input type="email" id="customerEmail" class="form-input"
+                                       placeholder="اختياري - لإرسال الاستطلاعات والإشعارات">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- معلومات الموقع -->
+                    <div class="bg-purple-50 p-4 rounded-lg mb-4">
+                        <h3 class="font-semibold text-gray-700 mb-3">
+                            <i class="fas fa-map-marker-alt ml-2"></i>
+                            معلومات الموقع
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="form-label">المنطقة</label>
+                                <input type="text" id="customerRegion" class="form-input"
+                                       placeholder="مثال: الرياض، مكة، الشرقية">
+                            </div>
+                            <div>
+                                <label class="form-label">المدينة</label>
+                                <input type="text" id="customerCity" class="form-input"
+                                       placeholder="مثال: الرياض، جدة، الدمام">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- التخصص -->
+                    <div class="bg-orange-50 p-4 rounded-lg mb-4">
+                        <h3 class="font-semibold text-gray-700 mb-3">
+                            <i class="fas fa-briefcase ml-2"></i>
+                            التخصص والاهتمامات
+                        </h3>
+                        <div>
+                            <label class="form-label">التخصص</label>
+                            <select id="customerSpecialization" class="form-input">
+                                <option value="">اختر التخصص</option>
+                                <option value="بيع">بيع</option>
+                                <option value="شراء">شراء</option>
+                                <option value="استثمار">استثمار</option>
+                                <option value="تطوير">تطوير</option>
+                                <option value="تمويل">تمويل</option>
+                                <option value="أخبار">أخبار</option>
+                                <option value="مناسبات وأحداث">مناسبات وأحداث</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div class="flex justify-end space-x-3 space-x-reverse mt-6">
-                        <button type="button" onclick="closeModal('customerModal')" 
+                        <button type="button" onclick="closeModal('customerModal')"
                                 class="btn-secondary">إلغاء</button>
                         <button type="submit" class="btn-primary">
                             <i class="fas fa-save ml-1"></i>
@@ -54,9 +122,9 @@ function showCustomerModal(customerId = null) {
             </div>
         </div>
     `;
-    
+
     document.body.insertAdjacentHTML('beforeend', modalHTML);
-    
+
     // إذا كان في وضع التحرير، املأ البيانات
     if (isEdit) {
         loadCustomerData(customerId);
@@ -246,40 +314,50 @@ function closeModal(modalId) {
 async function loadCustomerData(customerId) {
     const customer = customersData.find(c => c.id === customerId);
     if (customer) {
-        document.getElementById('customerName').value = customer.name || '';
+        document.getElementById('customerFirstName').value = customer.first_name || '';
+        document.getElementById('customerMiddleName').value = customer.middle_name || '';
+        document.getElementById('customerLastName').value = customer.last_name || '';
         document.getElementById('customerEmail').value = customer.email || '';
         document.getElementById('customerPhone').value = customer.phone || '';
-        document.getElementById('customerCompany').value = customer.company || '';
+        document.getElementById('customerCommunicationMethod').value = customer.communication_method || 'whatsapp';
+        document.getElementById('customerRegion').value = customer.region || '';
+        document.getElementById('customerCity').value = customer.city || '';
+        document.getElementById('customerSpecialization').value = customer.specialization || '';
     }
 }
 
 // إرسال نموذج العميل
 async function submitCustomerForm(event) {
     event.preventDefault();
-    
+
     const customerId = document.getElementById('customerId').value;
     const isEdit = customerId !== '';
-    
+
     const customerData = {
-        name: document.getElementById('customerName').value,
+        first_name: document.getElementById('customerFirstName').value,
+        middle_name: document.getElementById('customerMiddleName').value,
+        last_name: document.getElementById('customerLastName').value,
         email: document.getElementById('customerEmail').value,
         phone: document.getElementById('customerPhone').value,
-        company: document.getElementById('customerCompany').value
+        communication_method: document.getElementById('customerCommunicationMethod').value,
+        region: document.getElementById('customerRegion').value,
+        city: document.getElementById('customerCity').value,
+        specialization: document.getElementById('customerSpecialization').value
     };
-    
+
     try {
         showNotification('جاري حفظ البيانات...', 'info');
-        
+
         let response;
         if (isEdit) {
             response = await axios.put(`/api/customers/${customerId}`, customerData);
         } else {
             response = await axios.post('/api/customers', customerData);
         }
-        
+
         if (response.data) {
             showNotification(
-                isEdit ? 'تم تحديث بيانات العميل بنجاح ✓' : 'تم إضافة العميل بنجاح ✓', 
+                isEdit ? 'تم تحديث بيانات العميل بنجاح ✓' : 'تم إضافة العميل بنجاح ✓',
                 'success'
             );
             closeModal('customerModal');
@@ -373,4 +451,209 @@ function getHealthColor(score) {
     if (score >= 7) return '#10b981'; // أخضر
     if (score >= 4) return '#f59e0b'; // برتقالي
     return '#ef4444'; // أحمر
+}
+
+// نافذة استيراد العملاء من Excel
+function showImportCustomersModal() {
+    const modalHTML = `
+        <div id="importModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">
+                        <i class="fas fa-file-excel ml-2"></i>
+                        استيراد العملاء من Excel
+                    </h2>
+                    <button onclick="closeModal('importModal')" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+
+                <!-- التعليمات -->
+                <div class="bg-blue-50 border-r-4 border-blue-500 p-4 mb-4">
+                    <h3 class="font-bold text-blue-800 mb-2">
+                        <i class="fas fa-info-circle ml-2"></i>
+                        تعليمات الاستيراد
+                    </h3>
+                    <ul class="text-sm text-blue-700 space-y-1">
+                        <li>• قم بتحضير ملف Excel بالأعمدة التالية:</li>
+                        <li class="mr-4">- الاسم الأول (مطلوب)</li>
+                        <li class="mr-4">- الاسم الأوسط</li>
+                        <li class="mr-4">- اسم العائلة (مطلوب)</li>
+                        <li class="mr-4">- رقم الجوال (مطلوب)</li>
+                        <li class="mr-4">- البريد الإلكتروني</li>
+                        <li class="mr-4">- وسيلة التواصل (واتساب أو رسائل نصية)</li>
+                        <li class="mr-4">- المنطقة</li>
+                        <li class="mr-4">- المدينة</li>
+                        <li class="mr-4">- التخصص</li>
+                        <li>• احفظ الملف بصيغة CSV</li>
+                        <li>• تأكد من عدم وجود صف العناوين في الملف</li>
+                    </ul>
+                </div>
+
+                <!-- نموذج تحميل الملف -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        اختر ملف CSV
+                    </label>
+                    <input type="file" id="csvFileInput" accept=".csv,.txt"
+                           class="block w-full text-sm text-gray-500
+                                  file:mr-4 file:py-2 file:px-4
+                                  file:rounded-full file:border-0
+                                  file:text-sm file:font-semibold
+                                  file:bg-blue-50 file:text-blue-700
+                                  hover:file:bg-blue-100"
+                           onchange="previewCSVData()">
+                </div>
+
+                <!-- معاينة البيانات -->
+                <div id="csvPreview" class="hidden mb-4">
+                    <h3 class="font-semibold text-gray-700 mb-2">معاينة البيانات:</h3>
+                    <div class="bg-gray-50 p-4 rounded-lg max-h-64 overflow-y-auto">
+                        <table class="w-full text-sm" id="previewTable">
+                            <thead>
+                                <tr class="border-b">
+                                    <th class="text-right p-2">الاسم الأول</th>
+                                    <th class="text-right p-2">الاسم الأوسط</th>
+                                    <th class="text-right p-2">اسم العائلة</th>
+                                    <th class="text-right p-2">الجوال</th>
+                                    <th class="text-right p-2">التخصص</th>
+                                </tr>
+                            </thead>
+                            <tbody id="previewTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-2">
+                        <span id="previewCount">0</span> عميل جاهز للاستيراد
+                    </p>
+                </div>
+
+                <!-- الأزرار -->
+                <div class="flex justify-end space-x-3 space-x-reverse mt-6">
+                    <button type="button" onclick="closeModal('importModal')"
+                            class="btn-secondary">إلغاء</button>
+                    <button type="button" onclick="importCustomersFromCSV()"
+                            id="importButton" disabled
+                            class="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="fas fa-upload ml-1"></i>
+                        استيراد العملاء
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+// متغير لحفظ البيانات المحملة
+let csvData = [];
+
+// معاينة بيانات CSV
+function previewCSVData() {
+    const fileInput = document.getElementById('csvFileInput');
+    const file = fileInput.files[0];
+
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const text = e.target.result;
+        const lines = text.split('\n').filter(line => line.trim());
+
+        csvData = [];
+        const preview = document.getElementById('csvPreview');
+        const tbody = document.getElementById('previewTableBody');
+        const importButton = document.getElementById('importButton');
+
+        tbody.innerHTML = '';
+
+        lines.forEach((line, index) => {
+            const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+
+            // تخطي صف العناوين إذا كان موجودًا
+            if (index === 0 && (values[0].toLowerCase().includes('اسم') || values[0].toLowerCase().includes('name'))) {
+                return;
+            }
+
+            if (values.length >= 4) {
+                const customer = {
+                    first_name: values[0] || '',
+                    middle_name: values[1] || '',
+                    last_name: values[2] || '',
+                    phone: values[3] || '',
+                    email: values[4] || '',
+                    communication_method: values[5] || 'whatsapp',
+                    region: values[6] || '',
+                    city: values[7] || '',
+                    specialization: values[8] || ''
+                };
+
+                csvData.push(customer);
+
+                // إضافة صف للمعاينة (أول 5 فقط)
+                if (csvData.length <= 5) {
+                    const row = tbody.insertRow();
+                    row.innerHTML = `
+                        <td class="p-2 border-b">${customer.first_name}</td>
+                        <td class="p-2 border-b">${customer.middle_name}</td>
+                        <td class="p-2 border-b">${customer.last_name}</td>
+                        <td class="p-2 border-b">${customer.phone}</td>
+                        <td class="p-2 border-b">${customer.specialization}</td>
+                    `;
+                }
+            }
+        });
+
+        if (csvData.length > 0) {
+            preview.classList.remove('hidden');
+            document.getElementById('previewCount').textContent = csvData.length;
+            importButton.disabled = false;
+        } else {
+            showNotification('لم يتم العثور على بيانات صحيحة في الملف', 'error');
+        }
+    };
+
+    reader.readAsText(file);
+}
+
+// استيراد العملاء من CSV
+async function importCustomersFromCSV() {
+    if (csvData.length === 0) {
+        showNotification('لا توجد بيانات للاستيراد', 'error');
+        return;
+    }
+
+    const importButton = document.getElementById('importButton');
+    importButton.disabled = true;
+    importButton.innerHTML = '<i class="fas fa-spinner fa-spin ml-1"></i> جاري الاستيراد...';
+
+    try {
+        showNotification(`جاري استيراد ${csvData.length} عميل...`, 'info');
+
+        const response = await axios.post('/api/customers/import', {
+            customers: csvData
+        });
+
+        if (response.data) {
+            showNotification(
+                `${response.data.message}`,
+                response.data.failed > 0 ? 'warning' : 'success'
+            );
+
+            // عرض الأخطاء إن وجدت
+            if (response.data.errors && response.data.errors.length > 0) {
+                console.error('أخطاء الاستيراد:', response.data.errors);
+            }
+
+            closeModal('importModal');
+            await loadCustomers();
+            await loadStats();
+        }
+    } catch (error) {
+        console.error('خطأ في استيراد العملاء:', error);
+        showNotification('خطأ في استيراد العملاء', 'error');
+        importButton.disabled = false;
+        importButton.innerHTML = '<i class="fas fa-upload ml-1"></i> استيراد العملاء';
+    }
 }

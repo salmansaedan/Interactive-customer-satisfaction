@@ -154,6 +154,10 @@ app.get('/', (c) => {
                                     <i class="fas fa-bell ml-2"></i>
                                     فحص التنبيهات
                                 </button>
+                                <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700" onclick="showImportCustomersModal()">
+                                    <i class="fas fa-file-excel ml-2"></i>
+                                    استيراد من Excel
+                                </button>
                                 <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700" onclick="showCustomerModal()">
                                     <i class="fas fa-plus ml-2"></i>
                                     إضافة عميل جديد
@@ -388,11 +392,14 @@ app.get('/api/customers', async (c) => {
   try {
     const db = c.env.DB;
     const customers = await db.prepare(`
-      SELECT 
-        id, name, email, phone, company, 
-        health_score, health_status, 
+      SELECT
+        id, name, email, phone, company,
+        first_name, middle_name, last_name,
+        communication_method, region, city, specialization,
+        employee_id,
+        health_score, health_status,
         last_interaction_at, created_at
-      FROM customers 
+      FROM customers
       ORDER BY updated_at DESC
     `).all();
 
@@ -406,19 +413,44 @@ app.get('/api/customers', async (c) => {
 app.post('/api/customers', async (c) => {
   try {
     const db = c.env.DB;
-    const { name, email, phone, company } = await c.req.json();
-    
-    const result = await db.prepare(`
-      INSERT INTO customers (name, email, phone, company, updated_at) 
-      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `).bind(name, email, phone, company).run();
+    const {
+      first_name, middle_name, last_name,
+      email, phone,
+      communication_method = 'whatsapp',
+      region, city,
+      specialization,
+      employee_id,
+      company
+    } = await c.req.json();
 
-    return c.json({ 
-      id: result.meta.last_row_id, 
-      name, email, phone, company,
-      message: 'تم إضافة العميل بنجاح' 
+    // بناء الاسم الكامل من الأجزاء
+    const fullName = [first_name, middle_name, last_name].filter(Boolean).join(' ');
+
+    const result = await db.prepare(`
+      INSERT INTO customers (
+        name, first_name, middle_name, last_name,
+        email, phone,
+        communication_method, region, city, specialization,
+        employee_id, company,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).bind(
+      fullName, first_name, middle_name, last_name,
+      email, phone,
+      communication_method, region, city, specialization,
+      employee_id, company
+    ).run();
+
+    return c.json({
+      id: result.meta.last_row_id,
+      first_name, middle_name, last_name,
+      email, phone,
+      communication_method, region, city, specialization,
+      message: 'تم إضافة العميل بنجاح'
     });
   } catch (error) {
+    console.error('Error creating customer:', error);
     return c.json({ error: 'خطأ في إضافة العميل' }, 500);
   }
 });
@@ -450,20 +482,45 @@ app.put('/api/customers/:customerId', async (c) => {
   try {
     const db = c.env.DB;
     const customerId = c.req.param('customerId');
-    const { name, email, phone, company } = await c.req.json();
-    
-    await db.prepare(`
-      UPDATE customers 
-      SET name = ?, email = ?, phone = ?, company = ?, updated_at = CURRENT_TIMESTAMP 
-      WHERE id = ?
-    `).bind(name, email, phone, company, customerId).run();
+    const {
+      first_name, middle_name, last_name,
+      email, phone,
+      communication_method,
+      region, city,
+      specialization,
+      employee_id,
+      company
+    } = await c.req.json();
 
-    return c.json({ 
-      id: customerId, 
-      name, email, phone, company,
-      message: 'تم تحديث بيانات العميل بنجاح' 
+    // بناء الاسم الكامل من الأجزاء
+    const fullName = [first_name, middle_name, last_name].filter(Boolean).join(' ');
+
+    await db.prepare(`
+      UPDATE customers
+      SET
+        name = ?, first_name = ?, middle_name = ?, last_name = ?,
+        email = ?, phone = ?,
+        communication_method = ?, region = ?, city = ?, specialization = ?,
+        employee_id = ?, company = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(
+      fullName, first_name, middle_name, last_name,
+      email, phone,
+      communication_method, region, city, specialization,
+      employee_id, company,
+      customerId
+    ).run();
+
+    return c.json({
+      id: customerId,
+      first_name, middle_name, last_name,
+      email, phone,
+      communication_method, region, city, specialization,
+      message: 'تم تحديث بيانات العميل بنجاح'
     });
   } catch (error) {
+    console.error('Error updating customer:', error);
     return c.json({ error: 'خطأ في تحديث بيانات العميل' }, 500);
   }
 });
@@ -1055,6 +1112,110 @@ app.get('/api/level2-managers', async (c) => {
   } catch (error) {
     console.error('Error getting level 2 managers:', error);
     return c.json({ error: 'Failed to get managers' }, 500);
+  }
+});
+
+// استيراد العملاء من Excel (CSV format)
+// Import customers from Excel (CSV format)
+app.post('/api/customers/import', async (c) => {
+  try {
+    const db = c.env.DB;
+    const { customers } = await c.req.json();
+
+    if (!Array.isArray(customers) || customers.length === 0) {
+      return c.json({ error: 'يجب إرسال قائمة بالعملاء' }, 400);
+    }
+
+    const results = {
+      success: 0,
+      failed: 0,
+      errors: [] as string[]
+    };
+
+    // معالجة كل عميل
+    for (const customer of customers) {
+      try {
+        const {
+          first_name, middle_name, last_name,
+          email, phone,
+          communication_method = 'whatsapp',
+          region, city,
+          specialization,
+          employee_id
+        } = customer;
+
+        // التحقق من الحقول المطلوبة
+        if (!first_name || !phone) {
+          results.failed++;
+          results.errors.push(`العميل ${first_name || 'غير معروف'}: الاسم الأول ورقم الجوال مطلوبان`);
+          continue;
+        }
+
+        // بناء الاسم الكامل
+        const fullName = [first_name, middle_name, last_name].filter(Boolean).join(' ');
+
+        await db.prepare(`
+          INSERT INTO customers (
+            name, first_name, middle_name, last_name,
+            email, phone,
+            communication_method, region, city, specialization,
+            employee_id,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        `).bind(
+          fullName, first_name, middle_name, last_name,
+          email, phone,
+          communication_method, region, city, specialization,
+          employee_id
+        ).run();
+
+        results.success++;
+      } catch (error: any) {
+        results.failed++;
+        results.errors.push(`العميل ${customer.first_name || 'غير معروف'}: ${error.message}`);
+      }
+    }
+
+    return c.json({
+      message: `تم استيراد ${results.success} عميل بنجاح${results.failed > 0 ? ` وفشل ${results.failed}` : ''}`,
+      ...results
+    });
+  } catch (error) {
+    console.error('Error importing customers:', error);
+    return c.json({ error: 'خطأ في استيراد العملاء' }, 500);
+  }
+});
+
+// حذف عميل
+// Delete customer
+app.delete('/api/customers/:customerId', async (c) => {
+  try {
+    const db = c.env.DB;
+    const customerId = c.req.param('customerId');
+
+    // التحقق من عدم وجود تذاكر نشطة للعميل
+    const activeTickets = await db.prepare(`
+      SELECT COUNT(*) as count FROM tickets
+      WHERE customer_id = ? AND status NOT IN ('closed', 'resolved')
+    `).bind(customerId).first();
+
+    if (activeTickets && activeTickets.count > 0) {
+      return c.json({
+        error: 'لا يمكن حذف العميل لأنه يمتلك تذاكر نشطة'
+      }, 400);
+    }
+
+    await db.prepare(`
+      DELETE FROM customers WHERE id = ?
+    `).bind(customerId).run();
+
+    return c.json({
+      message: 'تم حذف العميل بنجاح'
+    });
+  } catch (error) {
+    console.error('Error deleting customer:', error);
+    return c.json({ error: 'خطأ في حذف العميل' }, 500);
   }
 });
 

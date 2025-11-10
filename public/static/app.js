@@ -107,44 +107,69 @@ function renderCustomers() {
         return;
     }
     
-    customersList.innerHTML = customersData.map(customer => `
-        <div class="customer-card bg-white border border-gray-200 rounded-lg p-4">
+    customersList.innerHTML = customersData.map(customer => {
+        // بناء الاسم الكامل
+        const fullName = customer.name || [customer.first_name, customer.middle_name, customer.last_name].filter(Boolean).join(' ');
+
+        return `
+        <div class="customer-card bg-white border border-gray-200 rounded-lg p-4 hover:shadow-lg transition-shadow">
             <div class="flex justify-between items-start">
                 <div class="flex-1">
                     <div class="flex items-center mb-2">
-                        <h3 class="text-lg font-semibold text-gray-800">${customer.name}</h3>
+                        <h3 class="text-lg font-semibold text-gray-800">${fullName}</h3>
                         <span class="health-indicator health-${customer.health_status} mr-3">
                             ${getHealthStatusText(customer.health_status)}
                         </span>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
+
+                    <!-- معلومات التواصل -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm text-gray-600 mb-2">
+                        ${customer.phone ? `
+                            <div class="flex items-center">
+                                <i class="fas fa-mobile-alt ml-1 text-blue-500"></i>
+                                <span>${customer.phone}</span>
+                                ${customer.communication_method === 'whatsapp' ?
+                                    '<i class="fab fa-whatsapp mr-1 text-green-500" title="واتساب"></i>' :
+                                    '<i class="fas fa-sms mr-1 text-gray-500" title="رسائل نصية"></i>'}
+                            </div>
+                        ` : ''}
                         ${customer.email ? `
-                            <div>
-                                <i class="fas fa-envelope ml-1"></i>
-                                ${customer.email}
+                            <div class="flex items-center">
+                                <i class="fas fa-envelope ml-1 text-red-500"></i>
+                                <span class="truncate">${customer.email}</span>
                             </div>
                         ` : `
                             <div class="text-gray-400">
                                 <i class="fas fa-envelope-slash ml-1"></i>
-                                لا يوجد بريد إلكتروني
+                                لا يوجد بريد
                             </div>
                         `}
-                        ${customer.phone ? `
-                            <div>
-                                <i class="fas fa-phone ml-1"></i>
-                                ${customer.phone}
+                        ${customer.specialization ? `
+                            <div class="flex items-center">
+                                <i class="fas fa-briefcase ml-1 text-purple-500"></i>
+                                <span>${customer.specialization}</span>
                             </div>
                         ` : ''}
-                        ${customer.company ? `
-                            <div>
-                                <i class="fas fa-building ml-1"></i>
-                                ${customer.company}
+                    </div>
+
+                    <!-- معلومات الموقع والصحة -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm text-gray-600">
+                        ${customer.region || customer.city ? `
+                            <div class="flex items-center">
+                                <i class="fas fa-map-marker-alt ml-1 text-orange-500"></i>
+                                <span>${[customer.city, customer.region].filter(Boolean).join(', ')}</span>
                             </div>
                         ` : ''}
-                        <div>
-                            <i class="fas fa-heart ml-1"></i>
-                            مؤشر الصحة: ${customer.health_score}/10
+                        <div class="flex items-center">
+                            <i class="fas fa-heart ml-1 text-red-400"></i>
+                            <span>مؤشر الصحة: ${customer.health_score}/10</span>
                         </div>
+                        ${customer.company ? `
+                            <div class="flex items-center">
+                                <i class="fas fa-building ml-1 text-gray-500"></i>
+                                <span>${customer.company}</span>
+                            </div>
+                        ` : ''}
                     </div>
                 </div>
                 <div class="flex flex-col space-y-2">
@@ -157,15 +182,15 @@ function renderCustomers() {
                         إنشاء تذكرة
                     </button>
                     ${customer.health_status === 'needs_attention' || customer.health_status === 'at_risk' ? `
-                        <button class="bg-orange-600 text-white px-3 py-1 rounded text-sm hover:bg-orange-700" 
-                                onclick="sendProactiveMessage(${customer.id}, 'check_in')" 
+                        <button class="bg-orange-600 text-white px-3 py-1 rounded text-sm hover:bg-orange-700"
+                                onclick="sendProactiveMessage(${customer.id}, 'check_in')"
                                 ${!customer.email ? 'disabled title="لا يوجد بريد إلكتروني"' : ''}>
                             <i class="fas fa-heart ml-1"></i>
                             ${customer.email ? 'رسالة اطمئنان' : 'اتصال مطلوب'}
                         </button>
                     ` : ''}
                     ${getLastInteractionDays(customer.last_interaction_at) > 30 ? `
-                        <button class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700" 
+                        <button class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
                                 onclick="sendProactiveMessage(${customer.id}, 'welcome_back')"
                                 ${!customer.email ? 'disabled title="لا يوجد بريد إلكتروني"' : ''}>
                             <i class="fas fa-handshake ml-1"></i>
@@ -175,7 +200,8 @@ function renderCustomers() {
                 </div>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // تحميل قائمة التذاكر
